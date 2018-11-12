@@ -3,9 +3,9 @@ cbmcArguments:
  depth: false
 units:
   - target:
-    - dir: target/classes/
+    - dir: target/classes
       file: com/floragunn/searchguard/support/WildcardMatcher.class
-      sourceDir: src/main/java/
+      sourceDir: src/main/java
       sourceFile: com/floragunn/searchguard/support/WildcardMatcher.java
 phases:
 -
