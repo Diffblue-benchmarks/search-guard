@@ -4,9 +4,9 @@ cbmcArguments:
 units:
 - target:
   - dir: target/classes
-    file: com/searchguard/mysql/support/WildcardMatcher.class
+    file: com/floragunn/searchguard/support/WildcardMatcher.class
     sourceDir: src/main/java
-    sourceFile: com/searchguard/mysql/support/WildcardMatcher.java
+    sourceFile: com/floragunn/searchguard/support/WildcardMatcher.java
 phases:
 -
  timeout: 300
