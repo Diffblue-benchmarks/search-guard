@@ -1,0 +1,37 @@
+# Tested on Deeptest release 1.7.0
+cbmcArguments:
+  classpath: '/tools/cbmc/models-simple-overlay.jar:/tools/cbmc/models.jar:.'
+  depth: false
+units:
+- target:
+  - dir: target/classes
+    file: com/searchguard/mysql/support/WildcardMatcher.class
+    sourceDir: src/main/java
+    sourceFile: com/searchguard/mysql/support/WildcardMatcher.java
+phases:
+-
+  timeout: 300
+  cbmcArguments:
+    java-assume-inputs-non-null: true
+    max-nondet-string-length: 1
+    max-nondet-array-length: 10
+    unwind: 2
+    string-non-empty: true 
+    do-not-test-methods-with-access: [ private ]
+    cover-function-only: false
+-
+  timeout: 300
+  cbmcArguments:
+    unwind: 6
+    max-nondet-string-length: 5
+    max-nondet-array-length: 3
+    do-not-test-methods-with-access: [ private ]
+    cover-function-only: false
+-
+  timeout: 300
+  cbmcArguments:
+    max-nondet-array-length: 30
+    max-nondet-string-length: 10
+    unwind: 3
+    do-not-test-methods-with-access: [ private ]
+    cover-function-only: false
