@@ -2,11 +2,11 @@
 cbmcArguments:
  depth: false
 units:
-- target:
-  - dir: target/classes
-    file: com/floragunn/searchguard/support/WildcardMatcher.class
-    sourceDir: src/main/java
-    sourceFile: com/floragunn/searchguard/support/WildcardMatcher.java
+  - target:
+    - dir: target/classes/
+      file: com/floragunn/searchguard/support/WildcardMatcher.class
+      sourceDir: src/main/java/
+      sourceFile: com/floragunn/searchguard/support/WildcardMatcher.java
 phases:
 -
  timeout: 300
@@ -25,7 +25,7 @@ phases:
    max-nondet-string-length: 5
    max-nondet-array-length: 3
    do-not-test-methods-with-access: [ private ]
-   cover-function-only: false
+   cover-function-only: false 
 -
  timeout: 300
  cbmcArguments:
