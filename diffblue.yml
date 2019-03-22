@@ -1,4 +1,4 @@
-cbmcArguments:
+skipVerification: true
 phases:
 -
 #0
