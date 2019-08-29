@@ -38,6 +38,12 @@ public class ConfigConstants {
     public static final String SG_FLS_FIELDS_HEADER = SG_CONFIG_PREFIX+"fls_fields";
     
     public static final String SG_MASKED_FIELD_HEADER = SG_CONFIG_PREFIX+"masked_fields";
+    
+    public static final String SG_DLS_QUERY_CCS = SG_CONFIG_PREFIX+"dls_query_ccs";
+
+    public static final String SG_FLS_FIELDS_CCS = SG_CONFIG_PREFIX+"fls_fields_ccs";
+    
+    public static final String SG_MASKED_FIELD_CCS = SG_CONFIG_PREFIX+"masked_fields_ccs";
 
     public static final String SG_CONF_REQUEST_HEADER = SG_CONFIG_PREFIX+"conf_request";
 
@@ -73,6 +79,8 @@ public class ConfigConstants {
     public static final String SG_USER = SG_CONFIG_PREFIX+"user";
     public static final String SG_USER_HEADER = SG_CONFIG_PREFIX+"user_header";
 
+    public static final String SG_INJECTED_USER = "injected_user";
+    
     public static final String SG_XFF_DONE = SG_CONFIG_PREFIX+"xff_done";
 
     public static final String SSO_LOGOUT_URL = SG_CONFIG_PREFIX+"sso_logout_url";
@@ -165,6 +173,10 @@ public class ConfigConstants {
     // Log4j
     public static final String SEARCHGUARD_AUDIT_LOG4J_LOGGER_NAME = "log4j.logger_name";
     public static final String SEARCHGUARD_AUDIT_LOG4J_LEVEL = "log4j.level";
+    
+    //retry
+    public static final String SEARCHGUARD_AUDIT_RETRY_COUNT = "searchguard.audit.config.retry_count";
+    public static final String SEARCHGUARD_AUDIT_RETRY_DELAY_MS = "searchguard.audit.config.retry_delay_ms";
 
         
     public static final String SEARCHGUARD_KERBEROS_KRB5_FILEPATH = "searchguard.kerberos.krb5_filepath";
@@ -178,6 +190,7 @@ public class ConfigConstants {
     public static final String SEARCHGUARD_CACHE_TTL_MINUTES = "searchguard.cache.ttl_minutes";
     public static final String SEARCHGUARD_ALLOW_UNSAFE_DEMOCERTIFICATES = "searchguard.allow_unsafe_democertificates";
     public static final String SEARCHGUARD_ALLOW_DEFAULT_INIT_SGINDEX = "searchguard.allow_default_init_sgindex";
+    public static final String SEARCHGUARD_BACKGROUND_INIT_IF_SGINDEX_NOT_EXIST = "searchguard.background_init_if_sgindex_not_exist";
 
     public static final String SEARCHGUARD_ROLES_MAPPING_RESOLUTION = "searchguard.roles_mapping_resolution";
 
@@ -195,6 +208,9 @@ public class ConfigConstants {
     public static final String SEARCHGUARD_COMPLIANCE_SALT_DEFAULT = "e1ukloTsQlOgPquJ";//16 chars
     public static final String SEARCHGUARD_COMPLIANCE_HISTORY_INTERNAL_CONFIG_ENABLED  = "searchguard.compliance.history.internal_config_enabled";
 
+    public static final String SEARCHGUARD_SSL_ONLY = "searchguard.ssl_only";
+    
+    public static final String SEARCHGUARD_DISABLE_ENVVAR_REPLACEMENT = "searchguard.disable_envvar_replacement";
     
     public enum RolesMappingResolution {
         MAPPING_ONLY,
@@ -209,10 +225,19 @@ public class ConfigConstants {
     // REST API
     public static final String SEARCHGUARD_RESTAPI_ROLES_ENABLED = "searchguard.restapi.roles_enabled";
     public static final String SEARCHGUARD_RESTAPI_ENDPOINTS_DISABLED = "searchguard.restapi.endpoints_disabled";
+    public static final String SEARCHGUARD_RESTAPI_PASSWORD_VALIDATION_REGEX = "searchguard.restapi.password_validation_regex";
+    public static final String SEARCHGUARD_RESTAPI_PASSWORD_VALIDATION_ERROR_MESSAGE = "searchguard.restapi.password_validation_error_message";
+
+    public static final String SEARCHGUARD_FILTER_SGINDEX_FROM_ALL_REQUESTS = "searchguard.filter_sgindex_from_all_requests";
 
     // Illegal Opcodes from here on
     public static final String SEARCHGUARD_UNSUPPORTED_RESTAPI_ACCEPT_INVALID_LICENSE = "searchguard.unsupported.restapi.accept_invalid_license";
     public static final String SEARCHGUARD_UNSUPPORTED_DISABLE_REST_AUTH_INITIALLY = "searchguard.unsupported.disable_rest_auth_initially";
     public static final String SEARCHGUARD_UNSUPPORTED_DISABLE_INTERTRANSPORT_AUTH_INITIALLY = "searchguard.unsupported.disable_intertransport_auth_initially";
+    public static final String SEARCHGUARD_UNSUPPORTED_RESTORE_SGINDEX_ENABLED = "searchguard.unsupported.restore.sgindex.enabled";
+    public static final String SEARCHGUARD_UNSUPPORTED_INJECT_USER_ENABLED = "searchguard.unsupported.inject_user.enabled";
+    public static final String SEARCHGUARD_UNSUPPORTED_INJECT_ADMIN_USER_ENABLED = "searchguard.unsupported.inject_user.admin.enabled";
+    public static final String SEARCHGUARD_UNSUPPORTED_ALLOW_NOW_IN_DLS = "searchguard.unsupported.allow_now_in_dls";
+    public static final String SEARCHGUARD_UNSUPPORTED_RESTAPI_ALLOW_SGCONFIG_MODIFICATION = "searchguard.unsupported.restapi.allow_sgconfig_modification";
 
 }

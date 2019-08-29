@@ -18,6 +18,23 @@ sg_all_access:
       '*':  
         - ALL
         
+sg_env_test:
+  cluster:
+    - '*'
+  indices:
+    '${env.INDEXNAME1:-index1}':
+      '*':  
+        - ALL
+    '${env.INDEXNAME2:-index2}':
+      '*':  
+        - ALL
+    '${user_name}':
+      '*':  
+        - ALL
+    '${env.INDEXNAME3}':
+      '*':  
+        - ALL
+        
 role.with.dot:
   cluster:
     - '*'
@@ -33,9 +50,15 @@ sg_zdummy_all:
     '*':
       '*':  
         - ALL
+  tenants:
+    admin_1: Rw
+    abcdef_2_2: RO
 
 sg_role_klingons1:
   indices:
+    '*':
+      '*':
+        - indices:admin/shards/search_shards
     klingonempire:
       ships:  
         - READ
@@ -358,6 +381,9 @@ sg_twitter:
     'twitter':
       '*':
         - '*'
+    'analytics':
+      '*':
+        - '*'
         
 sg_aliasmngt:
   indices:
@@ -375,7 +401,7 @@ sg_ua:
     'indexa*':
       '*':
         - '*'
-    'permitnotexistentindex':
+    'permitnotexistentindex*':
       '*':
         - '*'
     '*':
@@ -480,3 +506,60 @@ sg_557:
     '/\S*/':
       '*':
         - READ
+        
+sg_kibana_server:
+  readonly: true
+  cluster:
+      - CLUSTER_MONITOR
+      - CLUSTER_COMPOSITE_OPS
+      - cluster:admin/xpack/monitoring*
+      - indices:admin/template*
+      - indices:data/read/scroll*
+  indices:
+    '?kibana':
+      '*':
+        - INDICES_ALL
+    '?kibana-6':
+      '*':
+        - INDICES_ALL
+    '?kibana_*':
+      '*':
+        - INDICES_ALL
+    '?reporting*':
+      '*':
+        - INDICES_ALL
+    '?monitoring*':
+      '*':
+        - INDICES_ALL
+    '?tasks':
+      '*':
+        - INDICES_ALL
+    '*':
+      '*':
+        - "indices:admin/aliases*"
+
+sg_remote_ccs:
+  indices:
+    '*':
+      '*':
+        - indices:admin/shards/search_shards
+        
+sg_role_foo_index:
+  cluster:
+    - '*'
+  indices:
+    'foo-index':
+      '*':
+        - indices:data/read/*
+        - indices:admin/*
+        - indices:monitor/*
+        
+sg_role_foo_all:
+  cluster:
+    - '*'
+  indices:
+    'foo-*':
+      '*':
+        - indices:data/read/*
+        - indices:admin/*
+        - indices:monitor/*

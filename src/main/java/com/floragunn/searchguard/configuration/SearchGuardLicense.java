@@ -18,25 +18,29 @@
 package com.floragunn.searchguard.configuration;
 
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
 
+import com.floragunn.searchguard.support.SgUtils;
+
 public final class SearchGuardLicense implements Writeable {
 
+    private static final DateTimeFormatter DEFAULT_FOMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd").withLocale(SgUtils.EN_Locale);
+    
     private String uid;
     private Type type;
     private Feature[] features;
@@ -57,7 +61,7 @@ public final class SearchGuardLicense implements Writeable {
     private final ClusterService clusterService;
     
     public static SearchGuardLicense createTrialLicense(String issueDate, ClusterService clusterService, String msg) {
-        final SearchGuardLicense trialLicense =  new SearchGuardLicense("00000000-0000-0000-0000-000000000000", Type.TRIAL, Feature.values(), issueDate, addDays(issueDate, 61L), "The world", "floragunn GmbH", issueDate, 6, "*", Integer.MAX_VALUE, clusterService);
+        final SearchGuardLicense trialLicense =  new SearchGuardLicense("00000000-0000-0000-0000-000000000000", Type.TRIAL, Feature.values(), issueDate, addDays(issueDate, 60), "The world", "floragunn GmbH", issueDate, 6, "*", Integer.MAX_VALUE, clusterService);
         if(msg != null) {
             trialLicense.msgs.add(msg);
         }
@@ -76,7 +80,7 @@ public final class SearchGuardLicense implements Writeable {
         out.writeOptionalVInt(majorVersion);
         out.writeString(clusterName);
         out.writeInt(allowedNodeCount);
-        out.writeStringList(msgs);
+        out.writeStringCollection(msgs);
         out.writeLong(expiresInDays);
         out.writeBoolean(isExpired);
         out.writeBoolean(valid);
@@ -169,7 +173,8 @@ public final class SearchGuardLicense implements Writeable {
     }
     
     private void validate() {    
-        final Date now = new Date();
+        
+        final LocalDate today = LocalDate.now();
         
         if(uid == null || uid.isEmpty()) {
             valid = false;
@@ -182,30 +187,32 @@ public final class SearchGuardLicense implements Writeable {
         }
         
         try {
-            Date isd = parseDate(issueDate);
+            final LocalDate isd = parseDate(issueDate);
             
-            if(isd.after(now)) {
+            if(isd.isAfter(today)) {
                 valid = false;
                 msgs.add("License not valid yet.");
             }
             
         } catch (Exception e) {
+            e.printStackTrace();
             valid = false;
             msgs.add("'issued_date' not valid");
         }
         
         try {
-            Date exd = parseDate(expiryDate);
+            final LocalDate exd = parseDate(expiryDate);
             
-            if(exd.before(now)) {
+            if(exd.isBefore(today)) {
                 valid = false;
                 msgs.add("License is expired");
             } else {
                 isExpired = false;
-                expiresInDays = TimeUnit.DAYS.convert(exd.getTime()-now.getTime(), TimeUnit.MILLISECONDS); 
+                expiresInDays = diffDays(exd);
             }
             
         } catch (Exception e) {
+            e.printStackTrace();
             valid = false;
             msgs.add("'expiry_date' not valid");
         }
@@ -230,6 +237,7 @@ public final class SearchGuardLicense implements Writeable {
         try {
             parseDate(startDate);
         } catch (Exception e) {
+            e.printStackTrace();
             valid = false;
             msgs.add("'start_date' not valid");
         }
@@ -284,16 +292,17 @@ public final class SearchGuardLicense implements Writeable {
         COMPLIANCE
     }
    
-    private static Date parseDate(String date) throws ParseException {
-        return new SimpleDateFormat("yyyy-MM-dd").parse(date);
+    private static LocalDate parseDate(String date) {
+        return LocalDate.parse(date, DEFAULT_FOMATTER);
     }
     
-    private static String addDays(String date, long days) {
-        try {
-            return new SimpleDateFormat("yyyy-MM-dd").format(new Date(parseDate(date).getTime()+(days*1000L*60L*60L*24L)));
-        } catch (Exception e) {
-            return e.toString();
-        } 
+    private static String addDays(String date, int days) {
+        final LocalDate d = parseDate(date);
+        return DEFAULT_FOMATTER.format(d.plus(Period.ofDays(days)));
+    }
+    
+    private static long diffDays(LocalDate to) {  
+        return ChronoUnit.DAYS.between(LocalDate.now(), to);
     }
 
     public String getUid() {

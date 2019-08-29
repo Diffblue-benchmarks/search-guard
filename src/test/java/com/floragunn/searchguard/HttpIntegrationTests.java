@@ -17,12 +17,13 @@
 
 package com.floragunn.searchguard;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
+import org.apache.http.NoHttpResponseException;
 import org.apache.http.message.BasicHeader;
+import org.apache.logging.log4j.core.LogEvent;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest.AliasActions;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
@@ -32,6 +33,7 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.floragunn.searchguard.action.configupdate.ConfigUpdateAction;
@@ -45,7 +47,6 @@ import com.floragunn.searchguard.test.SingleClusterTest;
 import com.floragunn.searchguard.test.helper.file.FileHelper;
 import com.floragunn.searchguard.test.helper.rest.RestHelper;
 import com.floragunn.searchguard.test.helper.rest.RestHelper.HttpResponse;
-import com.floragunn.searchguard.test.helper.rules.SGTestWatcher;
 
 public class HttpIntegrationTests extends SingleClusterTest {
 
@@ -141,6 +142,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
             try (TransportClient tc = getInternalTransportClient()) {       
                 tc.index(new IndexRequest("searchguard").type("sg").id("roles").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("roles", FileHelper.readYamlContent("sg_roles_deny.yml"))).actionGet();
                 ConfigUpdateResponse cur = tc.execute(ConfigUpdateAction.INSTANCE, new ConfigUpdateRequest(new String[]{"roles"})).actionGet();
+                Assert.assertFalse(cur.hasFailures());
                 Assert.assertEquals(clusterInfo.numNodes, cur.getNodes().size());
             }
             
@@ -149,6 +151,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
             try (TransportClient tc = getInternalTransportClient()) {
                 tc.index(new IndexRequest("searchguard").type("sg").id("roles").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("roles", FileHelper.readYamlContent("sg_roles.yml"))).actionGet();
                 ConfigUpdateResponse cur = tc.execute(ConfigUpdateAction.INSTANCE, new ConfigUpdateRequest(new String[]{"roles"})).actionGet();
+                Assert.assertFalse(cur.hasFailures());
                 Assert.assertEquals(clusterInfo.numNodes, cur.getNodes().size());
             }
             
@@ -234,6 +237,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
             res = rh.executeGetRequest("/_searchguard/authinfo", new BasicHeader("sg_impersonate_as","knuddel"), encodeBasicHeader("worf", "worf"));
             Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
             Assert.assertTrue(res.getBody().contains("name=knuddel"));
+            Assert.assertTrue(res.getBody().contains("attr.internal.test1"));
             Assert.assertFalse(res.getBody().contains("worf"));
             
             res = rh.executeGetRequest("/_searchguard/authinfo", new BasicHeader("sg_impersonate_as","nonexists"), encodeBasicHeader("worf", "worf"));
@@ -317,6 +321,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
                 tc.index(new IndexRequest("searchguard").type("sg").id("config").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("config", FileHelper.readYamlContent("sg_config.yml"))).actionGet();
                 tc.index(new IndexRequest("searchguard").type("sg").setRefreshPolicy(RefreshPolicy.IMMEDIATE).id("internalusers").source("internalusers", FileHelper.readYamlContent("sg_internal_users.yml"))).actionGet();
                 ConfigUpdateResponse cur = tc.execute(ConfigUpdateAction.INSTANCE, new ConfigUpdateRequest(new String[]{"config","roles","rolesmapping","internalusers","actiongroups"})).actionGet();
+                Assert.assertFalse(cur.hasFailures());
                 Assert.assertEquals(clusterInfo.numNodes, cur.getNodes().size());
              }
     
@@ -347,6 +352,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
             tc.index(new IndexRequest("vulcangov").type("type").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":1}", XContentType.JSON)).actionGet();
             
             ConfigUpdateResponse cur = tc.execute(ConfigUpdateAction.INSTANCE, new ConfigUpdateRequest(new String[]{"config","roles","rolesmapping","internalusers","actiongroups"})).actionGet();
+            Assert.assertFalse(cur.hasFailures());
             Assert.assertEquals(clusterInfo.numNodes, cur.getNodes().size());
         }
     
@@ -367,6 +373,7 @@ public class HttpIntegrationTests extends SingleClusterTest {
     }
 
     @Test
+    @Ignore
     public void testHTTPPlaintextErrMsg() throws Exception {
         
         try {
@@ -379,9 +386,19 @@ public class HttpIntegrationTests extends SingleClusterTest {
             RestHelper rh = nonSslRestHelper();
             rh.executeGetRequest("", encodeBasicHeader("worf", "worf"));
             Assert.fail();
-        } catch (Exception e) {
-            String log = FileUtils.readFileToString(new File("unittest.log"), StandardCharsets.UTF_8);
-            Assert.assertTrue(log.contains("speaks http plaintext instead of ssl, will close the channel"));
+        } catch (NoHttpResponseException e) {
+            clusterHelper.stopCluster();
+            Assert.assertNotNull(appender);
+            List<LogEvent> logEvents = new ArrayList<LogEvent>(appender.getEvents());
+            Assert.assertTrue(logEvents.size() > 0);
+            for(LogEvent evt: logEvents) {
+                System.out.println("--> "+evt.getMessage().getFormattedMessage());
+                if(evt.getMessage().getFormattedMessage().contains("speaks http plaintext instead of ssl, will close the channel"))
+                {
+                    return;
+                }
+            }
+            Assert.fail(logEvents.toString());
         }
         
       }
@@ -596,5 +613,189 @@ public class HttpIntegrationTests extends SingleClusterTest {
         res = rh.executeGetRequest("/esb-prod-all/_search?pretty", encodeBasicHeader("itt1635", "nagilum"));
         Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
     }
+    
+    @Test
+    public void testTenantInfo() throws Exception {
+        final Settings settings = Settings.builder()
+                .build();
+        setup(Settings.EMPTY, new DynamicSgConfig(), settings);
+        
+        /*
+         
+            [admin_1, praxisrw, abcdef_2_2, kltentro, praxisro, kltentrw]
+			admin_1==.kibana_-1139640511_admin1
+			praxisrw==.kibana_-1386441176_praxisrw
+			abcdef_2_2==.kibana_-634608247_abcdef22
+			kltentro==.kibana_-2014056171_kltentro
+			praxisro==.kibana_-1386441184_praxisro
+			kltentrw==.kibana_-2014056163_kltentrw
+         
+         */
+        
+        try (TransportClient tc = getInternalTransportClient(this.clusterInfo, Settings.EMPTY)) {
+                        
+            tc.index(new IndexRequest(".kibana-6").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":2}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest(".kibana_-1139640511_admin1").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana_-1386441176_praxisrw").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana_-634608247_abcdef22").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana_-12345_123456").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana2_-12345_123456").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana_9876_xxx_ccc").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
+            tc.index(new IndexRequest(".kibana_fff_eee").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();
 
+            
+            tc.index(new IndexRequest("esb-prod-5").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":5}", XContentType.JSON)).actionGet();
+
+            tc.admin().indices().aliases(new IndicesAliasesRequest().addAliasAction(AliasActions.add().indices(".kibana-6").alias(".kibana"))).actionGet();
+            tc.admin().indices().aliases(new IndicesAliasesRequest().addAliasAction(AliasActions.add().indices("esb-prod-5").alias(".kibana_-2014056163_kltentrw"))).actionGet();
+            tc.admin().indices().aliases(new IndicesAliasesRequest().addAliasAction(AliasActions.add().indices("esb-prod-5").alias("esb-alias-5"))).actionGet();
+
+        }
+        
+        final RestHelper rh = nonSslRestHelper();
+
+        HttpResponse res = rh.executeGetRequest("/_searchguard/tenantinfo?pretty", encodeBasicHeader("itt1635", "nagilum"));
+        Assert.assertEquals(HttpStatus.SC_FORBIDDEN, res.getStatusCode());  
+
+        res = rh.executeGetRequest("/_searchguard/tenantinfo?pretty", encodeBasicHeader("kibanaserver", "kibanaserver"));
+        System.out.println(res.getBody());
+        Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
+        Assert.assertTrue(res.getBody().contains("\".kibana_-1139640511_admin1\" : \"admin_1\""));
+        Assert.assertTrue(res.getBody().contains("\".kibana_-1386441176_praxisrw\" : \"praxisrw\""));
+        Assert.assertTrue(res.getBody().contains(".kibana_-2014056163_kltentrw\" : \"kltentrw\""));
+        Assert.assertTrue(res.getBody().contains("\".kibana_-634608247_abcdef22\" : \"abcdef_2_2\""));
+        Assert.assertTrue(res.getBody().contains("\".kibana_-12345_123456\" : \"__private__\""));
+        Assert.assertFalse(res.getBody().contains(".kibana-6"));
+        Assert.assertFalse(res.getBody().contains("esb-"));
+        Assert.assertFalse(res.getBody().contains("xxx"));
+        Assert.assertFalse(res.getBody().contains(".kibana2"));
+    }
+    
+    @Test
+    public void testRestImpersonation() throws Exception {
+        final Settings settings = Settings.builder()
+                .putList(ConfigConstants.SEARCHGUARD_AUTHCZ_REST_IMPERSONATION_USERS+".worf", "someotherusernotininternalusersfile")
+                .build();
+        setup(Settings.EMPTY, new DynamicSgConfig().setSgConfig("sg_config_rest_impersonation.yml"), settings);
+        final RestHelper rh = nonSslRestHelper();
+        
+        //rest impersonation
+        HttpResponse res = rh.executeGetRequest("/_searchguard/authinfo", new BasicHeader("sg_impersonate_as","someotherusernotininternalusersfile"), encodeBasicHeader("worf", "worf"));
+        Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
+        Assert.assertTrue(res.getBody().contains("name=someotherusernotininternalusersfile"));
+        Assert.assertFalse(res.getBody().contains("worf"));
+    }
+    
+    @Test
+    public void testSslOnlyMode() throws Exception {
+        final Settings settings = Settings.builder()
+                .put(ConfigConstants.SEARCHGUARD_SSL_ONLY, true)
+                .build();
+        setupSslOnlyMode(settings);
+        final RestHelper rh = nonSslRestHelper();
+        
+        HttpResponse res = rh.executeGetRequest("/_searchguard/sslinfo");
+        Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
+        
+        res = rh.executePutRequest("/xyz/_doc/1","{\"a\":5}");
+        Assert.assertEquals(HttpStatus.SC_CREATED, res.getStatusCode());
+        
+        res = rh.executeGetRequest("/_mappings");
+        Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
+        
+        res = rh.executeGetRequest("/_search");
+        Assert.assertEquals(HttpStatus.SC_OK, res.getStatusCode());
+    }
+    
+    @Test
+    public void testAll() throws Exception {
+        final Settings settings = Settings.builder().build();
+        setup(settings);
+        final RestHelper rh = nonSslRestHelper();
+
+        try (TransportClient tc = getInternalTransportClient()) {
+            tc.index(new IndexRequest("abcdef").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":1}", XContentType.JSON))
+                    .actionGet();
+        }
+
+        Assert.assertEquals(HttpStatus.SC_FORBIDDEN, rh.executeGetRequest("_all/_search", encodeBasicHeader("worf", "worf")).getStatusCode());
+        Assert.assertEquals(HttpStatus.SC_FORBIDDEN, rh.executeGetRequest("*/_search", encodeBasicHeader("worf", "worf")).getStatusCode());
+        Assert.assertEquals(HttpStatus.SC_FORBIDDEN, rh.executeGetRequest("_search", encodeBasicHeader("worf", "worf")).getStatusCode());
+    }
+    
+
+    @Test
+    public void testRateLimiting() throws Exception {
+    
+            setup(Settings.EMPTY, new DynamicSgConfig().setSgConfig("sg_config_auth_ratelimiting.yml"), Settings.EMPTY, true);
+            
+            RestHelper rh = nonSslRestHelper();
+    
+            Assert.assertEquals(HttpStatus.SC_OK, rh.executeGetRequest("", encodeBasicHeader("nagilum", "nagilum")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("nagilum", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_OK, rh.executeGetRequest("", encodeBasicHeader("nagilum", "nagilum")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("nagilum", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("nagilum", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("nagilum", "nagilum")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_OK, rh.executeGetRequest("", encodeBasicHeader("worf", "worf")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x1", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x2", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x3", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x4", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x5", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x6", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x7", "wrong")).getStatusCode());
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("x8", "wrong")).getStatusCode());
+
+            Assert.assertEquals(HttpStatus.SC_UNAUTHORIZED, rh.executeGetRequest("", encodeBasicHeader("worf", "worf")).getStatusCode());
+
+            
+    }
+
+    @Test
+    public void testEnvReplace() throws Exception {
+        final Settings settings = Settings.builder()
+                .build();
+        setup(Settings.EMPTY, new DynamicSgConfig(), settings);
+
+        try (TransportClient tc = getInternalTransportClient(this.clusterInfo, Settings.EMPTY)) {
+            tc.index(new IndexRequest("index1").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":1}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("index2").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":2}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("index3").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("env.replace@example.comp.com").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":4}", XContentType.JSON)).actionGet();            
+        }
+        
+        final RestHelper rh = nonSslRestHelper();
+
+        HttpResponse res = rh.executeGetRequest("/index1/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_OK, res.getStatusCode());
+        res = rh.executeGetRequest("/index2/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_OK, res.getStatusCode());
+        res = rh.executeGetRequest("/env.replace@example.comp.com/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_OK, res.getStatusCode());
+        //res = rh.executeGetRequest("/index3/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        //Assert.assertEquals(res.getBody(), HttpStatus.SC_OK, res.getStatusCode());
+    }
+    
+    @Test
+    public void testNoEnvReplace() throws Exception {
+        final Settings settings = Settings.builder().put(ConfigConstants.SEARCHGUARD_DISABLE_ENVVAR_REPLACEMENT, true).build();
+        setup(Settings.EMPTY, new DynamicSgConfig(), settings);
+
+        try (TransportClient tc = getInternalTransportClient(this.clusterInfo, Settings.EMPTY)) {
+            tc.index(new IndexRequest("index1").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":1}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("index2").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":2}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("index3").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":3}", XContentType.JSON)).actionGet();            
+            tc.index(new IndexRequest("env.replace@example.comp.com").type("doc").setRefreshPolicy(RefreshPolicy.IMMEDIATE).source("{\"content\":4}", XContentType.JSON)).actionGet();            
+        }
+        
+        final RestHelper rh = nonSslRestHelper();
+
+        HttpResponse res = rh.executeGetRequest("/index1/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_FORBIDDEN, res.getStatusCode());
+        res = rh.executeGetRequest("/index2/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_FORBIDDEN, res.getStatusCode());
+        res = rh.executeGetRequest("/env.replace@example.comp.com/_search?pretty", encodeBasicHeader("env.replace@example.comp.com", "nagilum"));
+        Assert.assertEquals(res.getBody(), HttpStatus.SC_OK, res.getStatusCode());
+    }
 }
