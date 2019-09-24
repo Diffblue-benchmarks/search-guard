@@ -29,7 +29,6 @@
       <outputDirectory>${file.separator}deps</outputDirectory>
       <useProjectArtifact>true</useProjectArtifact>
       <unpack>false</unpack>
-      <scope>provided</scope>
     </dependencySet>
     <dependencySet>
       <outputDirectory>${file.separator}deps</outputDirectory>
